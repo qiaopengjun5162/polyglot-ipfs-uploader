@@ -1,0 +1,46 @@
+{
+  "name": "MyERC721Token01",
+  "description": "这是一个使用 TypeScript 脚本动态生成的 NFT 元数据，包含独特的属性组合。",
+  "image": "ipfs://bafybeifwvvo7qacd5ksephyxbqkqjih2dmm2ffgqa6u732b2evw5iijppi",
+  "external_url": "https://testnets.opensea.io/zh-CN/account/collected",
+
+  "attributes": [
+    {
+      "trait_type": "Background",
+      "value": "Blue",
+      "description": "背景颜色为天空蓝"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Green",
+      "description": "翡翠绿色的眼睛"
+    },
+    {
+      "trait_type": "Mouth",
+      "value": "Smile",
+      "description": "友好的微笑表情"
+    },
+    {
+      "trait_type": "Clothing",
+      "value": "T-shirt",
+      "description": "经典款白色T恤"
+    },
+    {
+      "trait_type": "Accessories",
+      "value": "Hat",
+      "description": "黑色棒球帽"
+    },
+    {
+      "display_type": "number",
+      "trait_type": "Generation",
+      "value": 1,
+      "description": "第一代原创作品"
+    },
+    {
+      "display_type": "date",
+      "trait_type": "Creation Date",
+      "value": 1730217600,
+      "description": "2024-10-01 创建的收藏品"
+    }
+  ]
+}

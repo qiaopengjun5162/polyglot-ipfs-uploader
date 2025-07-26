@@ -6,10 +6,12 @@ import shlex
 import shutil
 from pathlib import Path
 from datetime import datetime
-from typing import Any  # ✅ 新增：为更精确的类型注解导入 Any
+from typing import Any
 
-# --- 配置 ---
-# (此脚本不再需要 API 地址，因为它直接与命令行工具交互)
+# ✅ 配置开关
+# 设置为 True  -> 生成 1.json, 2.json... (用于需要后缀的合约)
+# 设置为 False -> 生成 1, 2... (用于标准 ERC721A 合约)
+USE_JSON_SUFFIX = False
 
 ################################################################
 # 核心上传函数 (使用 subprocess)
@@ -48,7 +50,7 @@ def upload_to_ipfs(target_path: Path) -> str | None:
 
 def upload_json_str_to_ipfs(
     data: dict[str, Any],
-) -> str | None:  # ✅ 优化：为 data 参数添加了更精确的类型注解
+) -> str | None:
     """
     将一个 Python 字典 (JSON 对象) 作为字符串直接上传到 IPFS。
     """
@@ -88,6 +90,7 @@ def process_single_nft(image_path: Path):
     """
     print("\n==============================================")
     print("🚀 开始处理单个 NFT...")
+    print(f"   - 文件后缀模式: {'.json' if USE_JSON_SUFFIX else '无'}")
     print("==============================================")
 
     image_cid = upload_to_ipfs(image_path)
@@ -107,15 +110,16 @@ def process_single_nft(image_path: Path):
     if not metadata_cid:
         return
 
-    # ✅ 新增：创建独立的输出文件夹，并将图片和 JSON 都保存在里面
+    # ✅ 创建独立的输出文件夹，并将图片和 JSON 都保存在里面
     output_dir = Path(__file__).parent / "output" / image_path.stem
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 复制图片
     _ = shutil.copy(image_path, output_dir / image_path.name)
 
-    # 保存元数据 JSON
-    output_file_path = output_dir / f"{image_path.stem}.json"
+    # 根据配置开关决定文件名
+    file_name = f"{image_path.stem}.json" if USE_JSON_SUFFIX else image_path.stem
+    output_file_path = output_dir / file_name
     with open(output_file_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
@@ -135,6 +139,7 @@ def process_batch_collection(images_input_dir: Path):
     """
     print("\n==============================================")
     print("🚀 开始处理批量 NFT 集合...")
+    print(f"   - 文件后缀模式: {'.json' if USE_JSON_SUFFIX else '无'}")
     print("==============================================")
 
     images_folder_cid = upload_to_ipfs(images_input_dir)
@@ -143,7 +148,7 @@ def process_batch_collection(images_input_dir: Path):
 
     print(f"\n🖼️  图片文件夹 CID 已获取: {images_folder_cid}")
 
-    # ✅ 新增：为本次批量处理创建一个带时间戳的唯一父文件夹
+    # ✅ 为本次批量处理创建一个带时间戳的唯一父文件夹
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     collection_output_dir = Path(__file__).parent / "output" / f"collection_{timestamp}"
     images_output_dir = collection_output_dir / "images"
@@ -155,6 +160,11 @@ def process_batch_collection(images_input_dir: Path):
 
     print("\n--- 正在为每张图片生成元数据 JSON 文件 ---")
     metadata_output_dir.mkdir(parents=True, exist_ok=True)
+
+    # 清理旧文件，防止混淆
+    for old_file in metadata_output_dir.glob("*"):
+        if old_file.is_file():
+            old_file.unlink()
 
     image_files = sorted(
         [
@@ -173,7 +183,9 @@ def process_batch_collection(images_input_dir: Path):
             "image": f"ipfs://{images_folder_cid}/{image_file.name}",
             "attributes": [{"trait_type": "ID", "value": int(token_id)}],
         }
-        with open(metadata_output_dir / f"{token_id}.json", "w", encoding="utf-8") as f:
+        # ✅ 根据配置开关决定文件名
+        file_name = f"{token_id}.json" if USE_JSON_SUFFIX else token_id
+        with open(metadata_output_dir / file_name, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=4, ensure_ascii=False)
 
     print(f"✅ 成功生成 {len(image_files)} 个元数据文件到: {metadata_output_dir}")
@@ -215,7 +227,7 @@ if __name__ == "__main__":
     # 运行工作流二：处理批量 NFT 集合
     process_batch_collection(batch_images_path)
 
-    # ✅ 新增：生产环境最终发布流程说明
+    # ✅ 生产环境最终发布流程说明
     print("\n======================================================================")
     print("✅ 本地准备工作已完成！")
     print("下一步是发布到专业的 Pinning 服务 (如 Pinata):")
@@ -227,12 +239,55 @@ if __name__ == "__main__":
 
 
 """
-python on  master [?] via 🐍 3.13.5 on 🐳 v28.2.2 (orbstack) via python
+polyglot-ipfs-uploader/python on  main on 🐳 v28.2.2 (orbstack) via uv 3.13.5
+➜ python main.py
+✅ 成功连接到 IPFS 节点
+
+==============================================
+🚀 开始处理批量 NFT 集合...
+   - 文件后缀模式: .json
+==============================================
+
+--- 正在执行上传命令: ipfs add -r -Q --cid-version 1 /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/assets/batch_images ---
+✅ 上传成功!
+   - 名称: batch_images
+   - CID: bafybeia22ed2lhakgwu76ojojhuavlxkccpclciy6hgqsmn6o7ur7cw44e
+
+🖼️  图片文件夹 CID 已获取: bafybeia22ed2lhakgwu76ojojhuavlxkccpclciy6hgqsmn6o7ur7cw44e
+
+💾 所有图片已复制到: /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250726_152634/images
+
+--- 正在为每张图片生成元数据 JSON 文件 ---
+✅ 成功生成 3 个元数据文件到: /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250726_152634/metadata
+
+--- 正在执行上传命令: ipfs add -r -Q --cid-version 1 /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250726_152634/metadata ---
+✅ 上传成功!
+   - 名称: metadata
+   - CID: bafybeiczqa75ljidb7esu464fj6a64nfujxcd2mum73t5yaw2llkrzb4zy
+
+📄 元数据文件夹 CID 已获取: bafybeiczqa75ljidb7esu464fj6a64nfujxcd2mum73t5yaw2llkrzb4zy
+
+--- ✨ 批量流程完成 ✨ ---
+下一步，您可以在合约中将 Base URI 设置为: ipfs://bafybeiczqa75ljidb7esu464fj6a64nfujxcd2mum73t5yaw2llkrzb4zy/
+
+======================================================================
+✅ 本地准备工作已完成！
+下一步是发布到专业的 Pinning 服务 (如 Pinata):
+1. 登录 Pinata。
+2. 上传您本地 `python/output/collection_[时间戳]/images` 文件夹。
+3. 上传您本地 `python/output/collection_[时间戳]/metadata` 文件夹。
+4. ⚠️  使用 Pinata 返回的【metadata】文件夹的 CID 来设置您合约的 Base URI。
+======================================================================
+
+
+
+polyglot-ipfs-uploader/python on  main [✘!?] on 🐳 v28.2.2 (orbstack) via uv 3.13.5
 ➜ python main.py
 ✅ 成功连接到 IPFS 节点
 
 ==============================================
 🚀 开始处理单个 NFT...
+   - 文件后缀模式: .json
 ==============================================
 
 --- 正在执行上传命令: ipfs add -r -Q --cid-version 1 /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/assets/image/IMG_20210626_180340.jpg ---
@@ -251,12 +306,57 @@ python on  master [?] via 🐍 3.13.5 on 🐳 v28.2.2 (orbstack) via python
 --- ✨ 单件流程完成 ✨ ---
 下一步，您可以在 mint 函数中使用这个元数据 URI: ipfs://bafkreigvggefv56bv6nmmqekyh2hc4iybn5lblinqimajatrvoxbbqcy2e
 
-python on  master [?] via 🐍 3.13.5 on 🐳 v28.2.2 (orbstack) via python
+======================================================================
+✅ 本地准备工作已完成！
+下一步是发布到专业的 Pinning 服务 (如 Pinata):
+1. 登录 Pinata。
+2. 上传您本地 `python/output/collection_[时间戳]/images` 文件夹。
+3. 上传您本地 `python/output/collection_[时间戳]/metadata` 文件夹。
+4. ⚠️  使用 Pinata 返回的【metadata】文件夹的 CID 来设置您合约的 Base URI。
+======================================================================
+
+polyglot-ipfs-uploader/python on  main [✘!?] on 🐳 v28.2.2 (orbstack) via uv 3.13.5
+➜ python main.py
+✅ 成功连接到 IPFS 节点
+
+==============================================
+🚀 开始处理单个 NFT...
+   - 文件后缀模式: 无
+==============================================
+
+--- 正在执行上传命令: ipfs add -r -Q --cid-version 1 /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/assets/image/IMG_20210626_180340.jpg ---
+✅ 上传成功!
+   - 名称: IMG_20210626_180340.jpg
+   - CID: bafybeifwvvo7qacd5ksephyxbqkqjih2dmm2ffgqa6u732b2evw5iijppi
+
+🖼️  图片 CID 已获取: bafybeifwvvo7qacd5ksephyxbqkqjih2dmm2ffgqa6u732b2evw5iijppi
+
+--- 正在上传 JSON 对象 ---
+✅ JSON 元数据上传成功!
+   - CID: bafkreigvggefv56bv6nmmqekyh2hc4iybn5lblinqimajatrvoxbbqcy2e
+
+💾 图片和元数据已在本地打包保存至: /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/IMG_20210626_180340
+
+--- ✨ 单件流程完成 ✨ ---
+下一步，您可以在 mint 函数中使用这个元数据 URI: ipfs://bafkreigvggefv56bv6nmmqekyh2hc4iybn5lblinqimajatrvoxbbqcy2e
+
+======================================================================
+✅ 本地准备工作已完成！
+下一步是发布到专业的 Pinning 服务 (如 Pinata):
+1. 登录 Pinata。
+2. 上传您本地 `python/output/collection_[时间戳]/images` 文件夹。
+3. 上传您本地 `python/output/collection_[时间戳]/metadata` 文件夹。
+4. ⚠️  使用 Pinata 返回的【metadata】文件夹的 CID 来设置您合约的 Base URI。
+======================================================================
+
+
+polyglot-ipfs-uploader/python on  main [✘!?] on 🐳 v28.2.2 (orbstack) via uv 3.13.5
 ➜ python main.py
 ✅ 成功连接到 IPFS 节点
 
 ==============================================
 🚀 开始处理批量 NFT 集合...
+   - 文件后缀模式: 无
 ==============================================
 
 --- 正在执行上传命令: ipfs add -r -Q --cid-version 1 /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/assets/batch_images ---
@@ -266,18 +366,27 @@ python on  master [?] via 🐍 3.13.5 on 🐳 v28.2.2 (orbstack) via python
 
 🖼️  图片文件夹 CID 已获取: bafybeia22ed2lhakgwu76ojojhuavlxkccpclciy6hgqsmn6o7ur7cw44e
 
-💾 所有图片已复制到: /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250724_213845/images
+💾 所有图片已复制到: /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250726_154609/images
 
 --- 正在为每张图片生成元数据 JSON 文件 ---
-✅ 成功生成 3 个元数据文件到: /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250724_213845/metadata
+✅ 成功生成 3 个元数据文件到: /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250726_154609/metadata
 
---- 正在执行上传命令: ipfs add -r -Q --cid-version 1 /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250724_213845/metadata ---
+--- 正在执行上传命令: ipfs add -r -Q --cid-version 1 /Users/qiaopengjun/Code/Solidity/YuanqiGenesis/polyglot-ipfs-uploader/python/output/collection_20250726_154609/metadata ---
 ✅ 上传成功!
    - 名称: metadata
-   - CID: bafybeiczqa75ljidb7esu464fj6a64nfujxcd2mum73t5yaw2llkrzb4zy
+   - CID: bafybeidcdd6osm2gvnxt3vlp434kmfq673fbkv4xtrrkqkpbkqe6iakvdm
 
-📄 元数据文件夹 CID 已获取: bafybeiczqa75ljidb7esu464fj6a64nfujxcd2mum73t5yaw2llkrzb4zy
+📄 元数据文件夹 CID 已获取: bafybeidcdd6osm2gvnxt3vlp434kmfq673fbkv4xtrrkqkpbkqe6iakvdm
 
 --- ✨ 批量流程完成 ✨ ---
-下一步，您可以在合约中将 Base URI 设置为: ipfs://bafybeiczqa75ljidb7esu464fj6a64nfujxcd2mum73t5yaw2llkrzb4zy/
+下一步，您可以在合约中将 Base URI 设置为: ipfs://bafybeidcdd6osm2gvnxt3vlp434kmfq673fbkv4xtrrkqkpbkqe6iakvdm/
+
+======================================================================
+✅ 本地准备工作已完成！
+下一步是发布到专业的 Pinning 服务 (如 Pinata):
+1. 登录 Pinata。
+2. 上传您本地 `python/output/collection_[时间戳]/images` 文件夹。
+3. 上传您本地 `python/output/collection_[时间戳]/metadata` 文件夹。
+4. ⚠️  使用 Pinata 返回的【metadata】文件夹的 CID 来设置您合约的 Base URI。
+======================================================================
 """
